@@ -2,4 +2,30 @@ title: TFG Daniel Guillén
 description: Diario de mi Trabajo de Fin de Grado
 url: "https://roboticslaburjc.github.io"
 baseurl: "/2026-tfg-daniel-guillen"
-theme: minima
+locale: es-ES
+logo: "/logo.png"
+
+remote_theme: mmistakes/minimal-mistakes
+minimal_mistakes_skin: default
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache
+
+author:
+  name: "Daniel Guillén"
+  bio: "Estudiante de la URJC"
+  links:
+    - label: "GitHub"
+      icon: "fab fa-fw fa-github"
+      url: "https://github.com/dguillenn"
+
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: single
+      author_profile: true
+      read_time: true
+      toc: true
