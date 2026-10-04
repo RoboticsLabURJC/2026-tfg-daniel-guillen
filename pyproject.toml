@@ -5,3 +5,10 @@ requires-python = ">=3.12"
 dependencies = [
     "mjlab==1.6.0",
 ]
+
+[build-system]
+requires = ["uv_build>=0.12.21,<0.13.0"]
+build-backend = "uv_build"
+
+[project.entry-points."mjlab.tasks"]
+tfg = "tfg"
