@@ -18,6 +18,7 @@ from mjlab.tasks.velocity import mdp
 from mjlab.terrains import TerrainEntityCfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
+from tfg import mdp as tfg_mdp
 
 
 def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
@@ -151,6 +152,20 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
     history_length=4,
   )
 
+  # Sensores de contacto entre cada dedo de la pinza y el cubo (para la
+  # recompensa de agarre). El cuerpo de cada dedo se fija por robot.
+  finger_cube_contact_cfgs = tuple(
+    ContactSensorCfg(
+      name=f"{side}_finger_cube_contact",
+      primary=ContactMatch(mode="body", pattern="", entity="robot"),  # Set per-robot.
+      secondary=ContactMatch(mode="body", pattern="cube", entity="cube"),
+      fields=("found",),
+      reduce="none",
+      num_slots=1,
+    )
+    for side in ("left", "right")
+  )
+
   rewards = {
     "lift": RewardTermCfg(
       func=manipulation_mdp.staged_position_reward,
@@ -170,6 +185,17 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
         "command_name": "lift_height",
         "object_name": "cube",
         "std": 0.05,
+      },
+    ),
+    # Escalón intermedio entre acercarse y levantar: premia que los dos dedos
+    # toquen el cubo. Peso menor que el de levantar (lift + lift_precise valen
+    # hasta 3) para que sujetarlo sin subirlo no sea la mejor estrategia.
+    "grasp": RewardTermCfg(
+      func=tfg_mdp.finger_contact_grasp,
+      weight=0.5,
+      params={
+        "left_sensor_name": "left_finger_cube_contact",
+        "right_sensor_name": "right_finger_cube_contact",
       },
     ),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.01),
@@ -215,7 +241,7 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
       terrain=TerrainEntityCfg(terrain_type="plane"),
       num_envs=1,
       env_spacing=1.0,
-      sensors=(ee_ground_collision_cfg,),
+      sensors=(ee_ground_collision_cfg, *finger_cube_contact_cfgs),
     ),
     observations=observations,
     actions=actions,

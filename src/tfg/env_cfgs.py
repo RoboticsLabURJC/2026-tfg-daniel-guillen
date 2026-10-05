@@ -74,6 +74,12 @@ def yam_lift_cube_env_cfg(
     if sensor.name == "ee_ground_collision":
       assert isinstance(sensor, ContactSensorCfg)
       sensor.primary.pattern = "link_6"
+    elif sensor.name == "left_finger_cube_contact":
+      assert isinstance(sensor, ContactSensorCfg)
+      sensor.primary.pattern = "lf_down"
+    elif sensor.name == "right_finger_cube_contact":
+      assert isinstance(sensor, ContactSensorCfg)
+      sensor.primary.pattern = "rf_down"
 
   cfg.viewer.body_name = "arm"
 
@@ -178,6 +184,13 @@ def yam_multi_cube_seg_env_cfg(
 ) -> ManagerBasedRlEnvCfg:
   """Multi-cube task: depth + segmentation mask for goal conditioning."""
   cfg = make_lift_cube_env_cfg()
+
+  # La recompensa de agarre está pensada para un solo cubo: se quita aquí.
+  cfg.rewards.pop("grasp")
+  assert cfg.scene.sensors is not None
+  cfg.scene.sensors = tuple(
+    s for s in cfg.scene.sensors if not s.name.endswith("_finger_cube_contact")
+  )
 
   cube_names = [f"cube_{i}" for i in range(num_cubes)]
   entities: dict[str, EntityCfg] = {"robot": get_yam_robot_cfg()}
