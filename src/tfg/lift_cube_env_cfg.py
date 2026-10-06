@@ -244,6 +244,21 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
   }
 
   curriculum = {
+    # Sube la altura del objetivo poco a poco (etapas: iteración de inicio, altura):
+    # primero cerca de la mesa, donde se aprende a levantar, y luego hasta 20–40 cm.
+    "target_height": CurriculumTermCfg(
+      func=tfg_mdp.target_height_curriculum,
+      params={
+        "command_name": "lift_height",
+        "stages": [
+          (0, (0.08, 0.15)),
+          (2000, (0.12, 0.20)),
+          (2500, (0.16, 0.25)),
+          (3000, (0.20, 0.30)),
+          (3500, (0.20, 0.40)),
+        ],
+      },
+    ),
     "joint_vel_hinge_weight": CurriculumTermCfg(
       func=manipulation_mdp.reward_curriculum,
       params={

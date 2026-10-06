@@ -96,7 +96,7 @@ def yam_lift_cube_vision_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     experiment_name="yam_lift_cube_vision",
     save_interval=100,
     num_steps_per_env=24,
-    max_iterations=3_000,
+    max_iterations=4_500,  # cubre todas las etapas del currículo de altura
     obs_groups={
       "actor": ("actor", "camera"),
       "critic": ("critic", "camera"),

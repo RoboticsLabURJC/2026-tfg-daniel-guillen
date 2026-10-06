@@ -92,6 +92,8 @@ def yam_lift_cube_env_cfg(
     # Higher command resampling frequency for more dynamic play.
     assert cfg.commands is not None
     cfg.commands["lift_height"].resampling_time_range = (4.0, 4.0)
+    # Sin currículo: usar directamente la altura final del objetivo.
+    cfg.commands["lift_height"].target_position_range.z = (0.20, 0.40)
 
   return cfg
 
@@ -188,6 +190,7 @@ def yam_multi_cube_seg_env_cfg(
   # La recompensa de agarre está pensada para un solo cubo: se quita aquí.
   cfg.rewards.pop("grasp")
   cfg.rewards.pop("grasped_in_air")
+  cfg.curriculum.pop("target_height")
   assert cfg.scene.sensors is not None
   cfg.scene.sensors = tuple(
     s for s in cfg.scene.sensors if not s.name.endswith("_finger_cube_contact") 

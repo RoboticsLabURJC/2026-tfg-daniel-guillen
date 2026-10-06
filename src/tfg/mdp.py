@@ -40,3 +40,25 @@ def grasped_in_air(
   ground: ContactSensor = env.scene[object_ground_sensor_name]
   on_ground = (ground.data.found > 0).any(dim=-1)
   return grasped * (~on_ground).float()
+
+
+def target_height_curriculum(
+  env: ManagerBasedRlEnv,
+  env_ids: torch.Tensor,
+  command_name: str,
+  stages: list[tuple[int, tuple[float, float]]],
+) -> dict[str, torch.Tensor]:
+  """Sube la altura del objetivo según la iteración del entrenamiento.
+
+  Cada etapa es (iteración en la que empieza, (altura mínima, altura máxima)).
+  """
+  iteration = env.common_step_counter // 24  # 24 pasos por iteración (num_steps_per_env)
+
+  height = stages[0][1]
+  for start_iteration, stage_height in stages:
+    if iteration >= start_iteration:
+      height = stage_height
+
+  command = env.command_manager.get_term(command_name)
+  command.cfg.target_position_range.z = height
+  return {"target_height_max": torch.tensor(height[1])}
