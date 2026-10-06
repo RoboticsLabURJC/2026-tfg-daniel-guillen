@@ -28,3 +28,15 @@ def finger_contact_grasp(
   left_touch = (left.data.found > 0).any(dim=-1)
   right_touch = (right.data.found > 0).any(dim=-1)
   return (left_touch & right_touch).float()
+
+def grasped_in_air(
+  env: ManagerBasedRlEnv,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_ground_sensor_name: str,
+) -> torch.Tensor:
+  """1 si el objeto está agarrado con los dos dedos y no toca la mesa, 0 si no."""
+  grasped = finger_contact_grasp(env, left_sensor_name, right_sensor_name)
+  ground: ContactSensor = env.scene[object_ground_sensor_name]
+  on_ground = (ground.data.found > 0).any(dim=-1)
+  return grasped * (~on_ground).float()

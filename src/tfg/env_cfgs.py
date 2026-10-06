@@ -187,9 +187,11 @@ def yam_multi_cube_seg_env_cfg(
 
   # La recompensa de agarre está pensada para un solo cubo: se quita aquí.
   cfg.rewards.pop("grasp")
+  cfg.rewards.pop("grasped_in_air")
   assert cfg.scene.sensors is not None
   cfg.scene.sensors = tuple(
-    s for s in cfg.scene.sensors if not s.name.endswith("_finger_cube_contact")
+    s for s in cfg.scene.sensors if not s.name.endswith("_finger_cube_contact") 
+      and s.name != "cube_ground_contact"
   )
 
   cube_names = [f"cube_{i}" for i in range(num_cubes)]

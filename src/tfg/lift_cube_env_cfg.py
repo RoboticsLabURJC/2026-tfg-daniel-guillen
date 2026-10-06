@@ -80,6 +80,9 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
         z=(0.02, 0.05),
         yaw=(-3.14, 3.14),
       ),
+      target_position_range=LiftingCommandCfg.TargetPositionRangeCfg(
+        z=(0.08, 0.15),
+      ),
     )
   }
 
@@ -165,6 +168,15 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
     )
     for side in ("left", "right")
   )
+  
+  cube_ground_contact_cfg = ContactSensorCfg(
+    name="cube_ground_contact",
+    primary=ContactMatch(mode="body", pattern="cube", entity="cube"),
+    secondary=ContactMatch(mode="body", pattern="terrain"),
+    fields=("found",),
+    reduce="none",
+    num_slots=1,
+  )
 
   rewards = {
     "lift": RewardTermCfg(
@@ -196,6 +208,15 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
       params={
         "left_sensor_name": "left_finger_cube_contact",
         "right_sensor_name": "right_finger_cube_contact",
+      },
+    ),
+    "grasped_in_air": RewardTermCfg(
+      func=tfg_mdp.grasped_in_air,
+      weight=5.0,
+      params={
+        "left_sensor_name": "left_finger_cube_contact",
+        "right_sensor_name": "right_finger_cube_contact",
+        "object_ground_sensor_name": "cube_ground_contact",
       },
     ),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.01),
@@ -241,7 +262,8 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
       terrain=TerrainEntityCfg(terrain_type="plane"),
       num_envs=1,
       env_spacing=1.0,
-      sensors=(ee_ground_collision_cfg, *finger_cube_contact_cfgs),
+      sensors=(ee_ground_collision_cfg, *finger_cube_contact_cfgs,
+               cube_ground_contact_cfg),
     ),
     observations=observations,
     actions=actions,
