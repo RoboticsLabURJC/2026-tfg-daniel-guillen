@@ -187,8 +187,7 @@ def yam_multi_cube_seg_env_cfg(
   """Multi-cube task: depth + segmentation mask for goal conditioning."""
   cfg = make_lift_cube_env_cfg()
 
-  # La recompensa de agarre está pensada para un solo cubo: se quita aquí.
-  cfg.rewards.pop("grasp")
+  # La recompensa de agarre en el aire está pensada para un solo cubo: se quita aquí.
   cfg.rewards.pop("grasped_in_air")
   cfg.curriculum.pop("target_height")
   assert cfg.scene.sensors is not None

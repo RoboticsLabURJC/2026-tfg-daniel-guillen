@@ -199,17 +199,6 @@ def make_lift_cube_env_cfg() -> ManagerBasedRlEnvCfg:
         "std": 0.05,
       },
     ),
-    # Escalón intermedio entre acercarse y levantar: premia que los dos dedos
-    # toquen el cubo. Peso menor que el de levantar (lift + lift_precise valen
-    # hasta 3) para que sujetarlo sin subirlo no sea la mejor estrategia.
-    "grasp": RewardTermCfg(
-      func=tfg_mdp.finger_contact_grasp,
-      weight=0.5,
-      params={
-        "left_sensor_name": "left_finger_cube_contact",
-        "right_sensor_name": "right_finger_cube_contact",
-      },
-    ),
     "grasped_in_air": RewardTermCfg(
       func=tfg_mdp.grasped_in_air,
       weight=5.0,
