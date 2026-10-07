@@ -1,0 +1,43 @@
+---
+# Hoja de estilos principal: carga el tema tal cual y añade el estilo de tarjetas
+---
+
+@charset "utf-8";
+
+@import "minimal-mistakes/skins/{{ site.minimal_mistakes_skin | default: 'default' }}";
+@import "minimal-mistakes";
+
+/* Entradas de la portada como tarjetas en cuadrícula */
+.entries-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.2em;
+}
+
+.entries-grid .grid__item {
+  float: none;
+  width: auto;
+  margin: 0;
+}
+
+.entries-grid .archive__item {
+  height: 100%;
+  padding: 1em 1.2em;
+  border: 1px solid $border-color;
+  border-radius: 8px;
+  background-color: mix(#fff, $background-color, 4%);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.entries-grid .archive__item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.entries-grid .archive__item-title {
+  margin-top: 0;
+}
+
+.entries-grid .archive__item-title a {
+  text-decoration: none;
+}
