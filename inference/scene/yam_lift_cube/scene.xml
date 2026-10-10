@@ -1,0 +1,197 @@
+<mujoco model="mjlab scene">
+  <compiler angle="radian" meshdir="assets" />
+  <option timestep="0.005" integrator="implicitfast" impratio="10" cone="elliptic" iterations="10" ls_iterations="20" ccd_iterations="50" />
+  <size nkey="1" />
+  <visual>
+    <global azimuth="135" elevation="-25" offwidth="1920" offheight="1080" />
+    <quality shadowsize="8192" />
+    <headlight ambient="0.3 0.3 0.3" diffuse="0.6 0.6 0.6" specular="0 0 0" />
+    <scale forcewidth="0.25" contactwidth="0.4" contactheight="0.15" framelength="5" framewidth="0.3" />
+    <rgba haze="0.15 0.25 0.35 1" force="1 0 0 1" />
+  </visual>
+  <statistic meansize="0.03" />
+  <default>
+    <default class="robot/main">
+      <default class="robot/yam">
+        <site group="5" rgba="0 1 0 1" />
+        <default class="robot/visual">
+          <geom type="mesh" contype="0" conaffinity="0" group="2" density="0" material="black" />
+        </default>
+        <default class="robot/collision">
+          <geom type="capsule" group="3" />
+          <default class="robot/sphere_collision">
+            <geom size="0.0006 0 0" type="sphere" group="4" rgba="1 0 0 1" />
+          </default>
+        </default>
+        <default class="robot/finger">
+          <joint type="slide" />
+        </default>
+      </default>
+    </default>
+  </default>
+  <asset>
+    <texture type="2d" colorspace="auto" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="4 4" reflectance="0.2" />
+    <material name="robot/black" rgba="0.25 0.25 0.25 1" />
+    <material name="robot/white" rgba="0.9 0.9 0.9 1" />
+    <mesh name="robot/model2" content_type="model/stl" file="model2.stl" />
+    <mesh name="robot/model2__2" content_type="model/stl" file="model2__2.stl" />
+    <mesh name="robot/model2__3" content_type="model/stl" file="model2__3.stl" />
+    <mesh name="robot/model2__4" content_type="model/stl" file="model2__4.stl" />
+    <mesh name="robot/model2__5" content_type="model/stl" file="model2__5.stl" />
+    <mesh name="robot/model2__6" content_type="model/stl" file="model2__6.stl" />
+    <mesh name="robot/model2__7" content_type="model/stl" file="model2__7.stl" />
+    <mesh name="robot/model2__8" content_type="model/stl" file="model2__8.stl" />
+    <mesh name="robot/model2__9" content_type="model/stl" file="model2__9.stl" />
+    <mesh name="robot/model2__10" content_type="model/stl" file="model2__10.stl" />
+    <mesh name="robot/model2__11" content_type="model/stl" file="model2__11.stl" />
+    <mesh name="robot/model2__12" content_type="model/stl" file="model2__12.stl" />
+    <mesh name="robot/model2__13" content_type="model/stl" file="model2__13.stl" />
+    <mesh name="robot/model2__14" content_type="model/stl" file="model2__14.stl" />
+    <mesh name="robot/model2__15" content_type="model/stl" file="model2__15.stl" />
+    <mesh name="robot/model2__16" content_type="model/stl" file="model2__16.stl" />
+    <mesh name="robot/model2__17" content_type="model/stl" file="model2__17.stl" />
+    <mesh name="robot/camera_d405" content_type="model/stl" file="d405.stl" />
+  </asset>
+  <worldbody>
+    <light name="sun" pos="0 0 1.5" dir="0 0 -1" type="directional" />
+    <body name="terrain">
+      <geom name="terrain" size="0 0 0.01" type="plane" material="groundplane" />
+    </body>
+    <body name="robot/mocap_base" pos="0 0 0.01" mocap="true">
+      <camera name="robot/front_cam" pos="1.1 0 0.5" quat="0.590322 0.389256 0.389256 0.590322" />
+      <light name="robot/spotlight" target="robot/link_6" pos="0 0 1" dir="0 0 -1" mode="targetbodycom" />
+      <body name="robot/arm" childclass="robot/yam">
+        <geom class="robot/visual" pos="0 0 -0.0006" quat="0.707107 0 0 0.707107" material="robot/black" mesh="robot/model2" />
+        <geom name="robot/base_collision" class="robot/collision" size="0.033 0.01" pos="0 0 0.026" contype="0" conaffinity="0" friction="0.6" />
+        <body name="robot/link_1" pos="0 0 0.0631" quat="0.707107 0 0 0.707107">
+          <inertial pos="-0.00192861 -0.00795735 0.0208176" quat="0.297851 0.642634 0.360045 0.607185" mass="0.12415" diaginertia="0.000180751 0.000145532 5.89179e-05" />
+          <joint name="robot/joint1" pos="0 0 0" axis="0 0 1" range="-2.61799 3.05433" armature="0.032" />
+          <geom class="robot/visual" pos="5.26159e-07 2.34355e-07 -0.0632" quat="1 0 0 0" material="robot/black" mesh="robot/model2__2" />
+          <body name="robot/link_2" pos="2.5e-05 -0.02 0.0409" quat="0.5 0.5 0.5 0.5">
+            <inertial pos="0.132008 2.10599e-06 0.000293073" quat="0.5 0.5 0.5 0.5" mass="1.24434" diaginertia="0.0121902 0.0121318 0.000683304" />
+            <joint name="robot/joint2" pos="0 0 0" axis="0 0 1" range="0 3.66519" armature="0.032" />
+            <geom class="robot/visual" pos="0.0199992 -0.1041 -2.44738e-05" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__3" />
+            <geom class="robot/visual" pos="0.0199992 -0.1041 -2.44738e-05" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__4" />
+            <geom class="robot/visual" pos="0.0199992 -0.1041 -2.44738e-05" quat="0.5 -0.5 -0.5 -0.5" material="robot/white" mesh="robot/model2__5" />
+            <geom name="robot/link2_1_collision" class="robot/collision" size="0.032 0.11" pos="0.13 0 0" quat="0.707107 0 0.707107 0" contype="0" conaffinity="0" friction="0.6" />
+            <geom name="robot/link2_2_collision" class="robot/collision" size="0.033 0.02" contype="0" conaffinity="0" friction="0.6" />
+            <geom name="robot/link2_3_collision" class="robot/collision" size="0.033 0.025" pos="0.265 0 0" contype="0" conaffinity="0" friction="0.6" />
+            <body name="robot/link_3" pos="0.264 0 0" quat="0 1 0 0">
+              <inertial pos="-0.121816 -0.054846 -0.000111108" quat="0.5 0.5 0.5 0.5" mass="0.853698" diaginertia="0.00699732 0.00696112 0.000788244" />
+              <joint name="robot/joint3" pos="0 0 0" axis="0 0 1" range="0 3.66519" armature="0.032" />
+              <geom class="robot/visual" pos="-0.244001 0.104101 2.44738e-05" quat="0.5 0.5 0.5 -0.5" material="robot/black" mesh="robot/model2__6" />
+              <geom class="robot/visual" pos="-0.244001 0.104101 2.44738e-05" quat="0.5 0.5 0.5 -0.5" material="robot/black" mesh="robot/model2__7" />
+              <geom class="robot/visual" pos="-0.244001 0.104101 2.44738e-05" quat="0.5 0.5 0.5 -0.5" material="robot/white" mesh="robot/model2__8" />
+              <geom class="robot/visual" pos="-0.244001 0.104101 2.44738e-05" quat="0.5 0.5 0.5 -0.5" material="robot/black" mesh="robot/model2__9" />
+              <geom name="robot/link3_1_collision" class="robot/collision" size="0.034 0.12" pos="-0.14 -0.06 0" quat="0.707107 0 0.707107 0" contype="0" conaffinity="0" friction="0.6" />
+              <geom name="robot/link3_2_collision" class="robot/collision" size="0.034 0.015" pos="-0.24 -0.06 0" contype="0" conaffinity="0" friction="0.6" />
+              <body name="robot/link_4" pos="-0.245 -0.06 0">
+                <inertial pos="-0.0769778 -0.0527104 0.000154878" quat="0.66661 0.66661 -0.235862 -0.235862" mass="0.463511" diaginertia="0.000791532 0.000744733 0.000282116" />
+                <joint name="robot/joint4" pos="0 0 0" axis="0 0 1" range="-1.5708 1.5708" armature="0.0018" />
+                <geom class="robot/visual" pos="0.00100023 0.164101 2.44738e-05" quat="0.5 0.5 0.5 -0.5" material="robot/black" mesh="robot/model2__10" />
+                <geom name="robot/link4_1_collision" class="robot/collision" size="0.03 0.015" pos="-0.073 -0.06 0" quat="0.707107 0.707107 0 0" contype="0" conaffinity="0" friction="0.6" />
+                <body name="robot/link_5" pos="-0.074 -0.0395 2.5e-05" quat="0.5 -0.5 0.5 0.5">
+                  <inertial pos="3.64861e-05 0.00025665 0.0353526" mass="0.350962" diaginertia="0.000197802 0.0001775 0.000147402" />
+                  <joint name="robot/joint5" pos="0 0 0" axis="0 0 1" range="-1.5708 1.5708" armature="0.0018" />
+                  <geom class="robot/visual" pos="0 -0.0749971 0.203601" quat="1.32679e-06 1 0 0" material="robot/black" mesh="robot/model2__11" />
+                  <geom name="robot/link5_1_collision" class="robot/collision" size="0.03 0.015" pos="0 0.025 0.0395" quat="0.707107 0.707107 0 0" contype="0" conaffinity="0" friction="0.6" />
+                  <body name="robot/link_6" pos="0 0.0353 0.0395" quat="0.707107 -0.707107 0 0">
+                    <inertial pos="-0.000217767 7.37059e-05 0.0270545" quat="0.707107 0.707107 0 0" mass="0.367476" diaginertia="0.000265958 0.000242686 0.000227409" />
+                    <joint name="robot/joint6" pos="0 0 0" axis="0 0 1" range="-2.0944 2.0944" armature="0.0018" />
+                    <geom class="robot/visual" pos="0 -0.164101 -0.110597" quat="0.707107 -0.707107 0 0" material="robot/black" mesh="robot/model2__12" />
+                    <geom class="robot/visual" pos="0 -0.164101 -0.110597" quat="0.707107 -0.707107 0 0" material="robot/black" mesh="robot/model2__13" />
+                    <geom name="robot/link6_1_collision" class="robot/collision" size="0.01 0.035" pos="0 0.039 0.052" quat="0.707107 0 0.707107 0" friction="0.6" />
+                    <geom name="robot/link6_2_collision" class="robot/collision" size="0.03 0.005" pos="0 0 0.03" quat="0.707107 0 0 0.707107" friction="0.6" />
+                    <geom name="robot/link6_3_collision" class="robot/collision" size="0.01 0.035" pos="0 -0.039 0.052" quat="0.707107 0 0.707107 0" friction="0.6" />
+                    <site name="robot/tcp_site" pos="0 0 0" quat="0.707107 0 0 -0.707107" />
+                    <site name="robot/grasp_site" pos="0 -0.03 0.1247" quat="0.707107 0 0 -0.707107" />
+                    <body name="robot/link_left_finger" pos="-0.037 0.0392 0.0605" quat="0.707107 0 0.707107 0">
+                      <inertial pos="-0.0192995 -0.0365902 0.039774" quat="0.757517 0.569023 -0.31997 0" mass="0.118" diaginertia="0.000159084 0.000154909 4.63655e-05" />
+                      <joint name="robot/left_finger" class="robot/finger" pos="0 0 0" axis="0 0 1" range="-0.00205 0.037524" armature="2.60305" />
+                      <geom class="robot/visual" pos="0.171097 -0.203301 0.037" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__14" />
+                      <geom class="robot/visual" pos="0.171097 -0.203301 0.037" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__15" />
+                      <body name="robot/lf_rot" pos="0 -0.0392 0.037" quat="0.5 -0.5 -0.5 0.5">
+                        <geom name="robot/lf_rot1_collision" class="robot/collision" size="0.01 0.03" pos="0 -0.02 0.012" quat="0.707107 0 0.707107 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                        <geom name="robot/lf_rot2_collision" class="robot/collision" size="0.01 0.02" pos="-0.02 -0.01 0.032" quat="0.371391 0 0.928477 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                        <body name="robot/lf_down" pos="-0.044 0 0">
+                          <geom name="robot/lf_down1_collision" class="robot/collision" size="0.01 0.01" pos="0 -0.02 0.012" quat="0.995037 -0.0995037 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/lf_down2_collision" class="robot/collision" size="0.003 0.022" pos="0.005 -0.014 0.04" quat="0.980581 -0.196116 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/lf_down3_collision" class="robot/collision" size="0.003 0.022" pos="-0.005 -0.014 0.04" quat="0.980581 -0.196116 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/lf_down4_collision" class="robot/collision" size="0.006 0.002 0.04" pos="0 -0.0024 0.046" type="box" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/lf_down5_collision" class="robot/collision" size="0.006 0.002 0.039" pos="0.027 -0.0024 0.053" quat="0.371391 0 0.928477 0" type="box" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/lf_down6_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.078" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/lf_down7_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.078" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/lf_down8_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.07" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/lf_down9_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.07" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/lf_down10_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.06" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/lf_down11_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.06" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                        </body>
+                      </body>
+                    </body>
+                    <body name="robot/camera_d405" pos="-0.0107 0.079729 0.066021" quat="0.953717 0.300706 0 0">
+                      <geom class="robot/visual" material="robot/black" mesh="robot/camera_d405" />
+                      <geom class="robot/collision" size="0.018 0.018 0.01" pos="0 0 -0.01" type="box" contype="0" conaffinity="0" group="4" />
+                      <body name="robot/camera_frame" pos="0.009 0 0" quat="0 0 0 1">
+                        <camera name="robot/camera_d405" pos="0 0 0" quat="0 1 0 0" resolution="1280 720" sensorsize="0.003896 0.00214" focal="0.00193 0.00193" />
+                      </body>
+                    </body>
+                    <body name="robot/link_right_finger" pos="0.037 -0.0392 0.0605" quat="0.707107 0 0.707107 0">
+                      <inertial pos="-0.0192995 0.0365902 -0.039774" quat="-0.757517 0.569023 -0.31997 0" mass="0.118" diaginertia="0.000159084 0.000154909 4.63655e-05" />
+                      <joint name="robot/right_finger" class="robot/finger" pos="0 0 0" axis="0 0 1" range="-0.037524 0.00205" />
+                      <geom class="robot/visual" pos="0.171097 -0.124901 -0.037" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__16" />
+                      <geom class="robot/visual" pos="0.171097 -0.124901 -0.037" quat="0.5 -0.5 -0.5 -0.5" material="robot/black" mesh="robot/model2__17" />
+                      <body name="robot/rf_rot" pos="0 0.0392 -0.037" quat="0.5 0.5 -0.5 -0.5">
+                        <geom name="robot/rf_rot1_collision" class="robot/collision" size="0.01 0.03" pos="0 -0.02 0.012" quat="0.707107 0 0.707107 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                        <geom name="robot/rf_rot2_collision" class="robot/collision" size="0.01 0.02" pos="0.02 -0.01 0.032" quat="0.371391 0 -0.928477 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                        <body name="robot/rf_down" pos="0.044 0 0">
+                          <geom name="robot/rf_down1_collision" class="robot/collision" size="0.01 0.01" pos="0 -0.02 0.012" quat="0.995037 -0.0995037 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/rf_down2_collision" class="robot/collision" size="0.003 0.022" pos="0.005 -0.014 0.04" quat="0.980581 -0.196116 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/rf_down3_collision" class="robot/collision" size="0.003 0.022" pos="-0.005 -0.014 0.04" quat="0.980581 -0.196116 0 0" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/rf_down4_collision" class="robot/collision" size="0.006 0.002 0.04" pos="0 -0.0024 0.046" type="box" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/rf_down5_collision" class="robot/collision" size="0.006 0.002 0.039" pos="-0.027 -0.0024 0.053" quat="0.371391 0 -0.928477 0" type="box" friction="0.6" rgba="0.381493 0.492734 0.780446 1" />
+                          <geom name="robot/rf_down6_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.078" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/rf_down7_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.078" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/rf_down8_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.07" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/rf_down9_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.07" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/rf_down10_collision" class="robot/sphere_collision" pos="0.003 -0.0004 0.06" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                          <geom name="robot/rf_down11_collision" class="robot/sphere_collision" pos="-0.003 -0.0004 0.06" condim="6" priority="1" friction="1 0.005 0.0005" solref="0.01" />
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="cube/cube">
+      <joint name="cube/cube_joint" type="free" />
+      <geom name="cube/cube_geom" size="0.02 0.02 0.02" type="box" mass="0.05" rgba="0.8 0.2 0.2 1" />
+    </body>
+  </worldbody>
+  <equality>
+    <joint joint1="robot/left_finger" joint2="robot/right_finger" polycoef="0 -1 0 0 0" />
+  </equality>
+  <actuator>
+    <general name="robot/joint1" joint="robot/joint1" ctrllimited="false" ctrlrange="-4.05776 4.4941" forcelimited="true" forcerange="-28 28" biastype="affine" gainprm="19.4475" biasprm="0 -19.4475 -6.19034" />
+    <general name="robot/joint2" joint="robot/joint2" ctrllimited="false" ctrlrange="-0.639167 4.30436" forcelimited="true" forcerange="-28 28" biastype="affine" gainprm="43.807" biasprm="0 -43.807 -13.9442" />
+    <general name="robot/joint3" joint="robot/joint3" ctrllimited="false" ctrlrange="-0.761771 4.42696" forcelimited="true" forcerange="-28 28" biastype="affine" gainprm="36.7565" biasprm="0 -36.7565 -11.6999" />
+    <general name="robot/joint4" joint="robot/joint4" ctrllimited="false" ctrlrange="-3.67088 3.67088" forcelimited="true" forcerange="-10 10" biastype="affine" gainprm="4.76173" biasprm="0 -4.76173 -1.51571" />
+    <general name="robot/joint5" joint="robot/joint5" ctrllimited="false" ctrlrange="-8.50985 8.50985" forcelimited="true" forcerange="-10 10" biastype="affine" gainprm="1.44112" biasprm="0 -1.44112 -0.458723" />
+    <general name="robot/joint6" joint="robot/joint6" ctrllimited="false" ctrlrange="-24.1745 24.1745" forcelimited="true" forcerange="-10 10" biastype="affine" gainprm="0.452896" biasprm="0 -0.452896 -0.144161" />
+    <general name="robot/left_finger" joint="robot/left_finger" ctrllimited="false" ctrlrange="-0.348346 0.38382" forcelimited="true" forcerange="-38.0282 38.0282" biastype="affine" gainprm="109.814" biasprm="0 -109.814 -69.9098" />
+  </actuator>
+  <sensor>
+    <contact subtree1="robot/link_6" body2="terrain" name="ee_ground_collision_link_6_found" />
+    <contact subtree1="robot/link_6" body2="terrain" data="force" name="ee_ground_collision_link_6_force" />
+    <contact body1="robot/lf_down" body2="cube/cube" name="left_finger_cube_contact_lf_down_found" />
+    <contact body1="robot/rf_down" body2="cube/cube" name="right_finger_cube_contact_rf_down_found" />
+    <contact body1="cube/cube" body2="terrain" name="cube_ground_contact_cube_found" />
+  </sensor>
+  <keyframe>
+    <key name="init_state" qpos="0 1.047 1.05 -0.9 0 0 0.01875 -0.01875 0 0 0 1 0 0 0" ctrl="0 1.047 1.05 -0.9 0 0 0.01875" />
+  </keyframe>
+</mujoco>
