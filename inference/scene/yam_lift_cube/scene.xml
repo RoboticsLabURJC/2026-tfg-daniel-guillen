@@ -133,7 +133,7 @@
                       <geom class="robot/visual" material="robot/black" mesh="robot/camera_d405" />
                       <geom class="robot/collision" size="0.018 0.018 0.01" pos="0 0 -0.01" type="box" contype="0" conaffinity="0" group="4" />
                       <body name="robot/camera_frame" pos="0.009 0 0" quat="0 0 0 1">
-                        <camera name="robot/camera_d405" pos="0 0 0" quat="0 1 0 0" resolution="1280 720" sensorsize="0.003896 0.00214" focal="0.00193 0.00193" />
+                        <camera name="robot/camera_d405" pos="0 0 0" quat="0 1 0 0" fovy="58.008" />
                       </body>
                     </body>
                     <body name="robot/link_right_finger" pos="0.037 -0.0392 0.0605" quat="0.707107 0 0.707107 0">
