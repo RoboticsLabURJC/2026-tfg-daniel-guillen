@@ -1,5 +1,5 @@
 import colorsys
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import mujoco
 
@@ -21,6 +21,7 @@ from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import CameraSensorCfg, ContactSensorCfg
 from mjlab.tasks.manipulation import mdp as manipulation_mdp
 from tfg.lift_cube_env_cfg import make_lift_cube_env_cfg
+from tfg.pick_place_env_cfg import make_pick_place_env_cfg
 from mjlab.tasks.manipulation.mdp import MultiCubeLiftingCommandCfg
 
 
@@ -44,8 +45,10 @@ def get_cube_spec(
 
 def yam_lift_cube_env_cfg(
   play: bool = False,
+  make_base_cfg: Callable[[], ManagerBasedRlEnvCfg] = make_lift_cube_env_cfg,
 ) -> ManagerBasedRlEnvCfg:
-  cfg = make_lift_cube_env_cfg()
+  # make_base_cfg: tarea base sobre la que se pone el YAM (lift o pick and place).
+  cfg = make_base_cfg()
 
   cfg.scene.entities = {
     "robot": get_yam_robot_cfg(),
@@ -101,8 +104,9 @@ def yam_lift_cube_env_cfg(
 def yam_lift_cube_vision_env_cfg(
   cam_type: Literal["rgb", "depth"],
   play: bool = False,
+  make_base_cfg: Callable[[], ManagerBasedRlEnvCfg] = make_lift_cube_env_cfg,
 ) -> ManagerBasedRlEnvCfg:
-  cfg = yam_lift_cube_env_cfg(play=play)
+  cfg = yam_lift_cube_env_cfg(play=play, make_base_cfg=make_base_cfg)
 
   camera_names = ["robot/camera_d405"]
   cam_kwargs = {
@@ -178,6 +182,23 @@ def _cube_color(i: int, n: int) -> tuple[float, float, float, float]:
   h = i / max(n, 1)
   r, g, b = colorsys.hsv_to_rgb(h, 0.8, 0.9)
   return (r, g, b, 1.0)
+
+
+def yam_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Pick and place con el YAM y la cámara de profundidad de la muñeca.
+
+  De momento es igual que el lift con cámara de profundidad; la tarea propia
+  está en pick_place_env_cfg.py.
+  """
+  cfg = yam_lift_cube_vision_env_cfg(
+    cam_type="depth", play=play, make_base_cfg=make_pick_place_env_cfg
+  )
+  
+  if play:
+    cfg.commands["lift_height"].target_position_range.z = (0.02, 0.02)
+    cfg.commands["lift_height"].resampling_time_range = (4.0, 6.0)
+  
+  return cfg
 
 
 def yam_multi_cube_seg_env_cfg(

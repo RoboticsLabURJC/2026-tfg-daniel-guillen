@@ -62,3 +62,27 @@ def target_height_curriculum(
   command = env.command_manager.get_term(command_name)
   command.cfg.target_position_range.z = height
   return {"target_height_max": torch.tensor(height[1])}
+
+
+def released_at_target(
+  env: ManagerBasedRlEnv,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_ground_sensor_name: str,
+  command_name: str,
+  object_name: str,
+  std: float,
+) -> torch.Tensor:
+  """0-1: objeto cerca del objetivo, en el suelo y sin agarrar con los dos dedos."""
+  released = 1 - finger_contact_grasp(env, left_sensor_name, right_sensor_name)
+  ground: ContactSensor = env.scene[object_ground_sensor_name]
+  on_ground = (ground.data.found > 0).any(dim=-1)
+  obj = env.scene[object_name]
+  command = env.command_manager.get_term(command_name)
+  # Distancia al cuadrado cubo-objetivo (x² + y² + z²) y premio gaussiano:
+  # 1 en el objetivo, 0.37 a una distancia std, casi 0 a 2·std.
+  distance2 = torch.sum(
+    torch.square(command.target_pos - obj.data.root_link_pos_w), dim=-1
+  )
+  near = torch.exp(-distance2 / std**2)
+  return near * released * on_ground.float()

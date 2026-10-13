@@ -104,6 +104,13 @@ def yam_lift_cube_vision_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   )
 
 
+def yam_pick_place_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Igual que el lift con cámara, guardando en otra carpeta de logs."""
+  cfg = yam_lift_cube_vision_ppo_runner_cfg()
+  cfg.experiment_name = "yam_pick_place"
+  return cfg
+
+
 def yam_multi_cube_seg_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
