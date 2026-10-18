@@ -42,6 +42,11 @@ scene_option = mujoco.MjvOption()
 scene_option.geomgroup[:] = [1, 0, 0, 1, 0, 0]
 
 with mujoco.viewer.launch_passive(m, d) as viewer:
+  
+  viewer.cam.lookat[:] = [0.2, 0.0, 0.1]
+  viewer.cam.distance = 1.0
+  viewer.cam.azimuth = 180
+  viewer.cam.elevation = -10
 
   while viewer.is_running():
     step_start = time.time()
