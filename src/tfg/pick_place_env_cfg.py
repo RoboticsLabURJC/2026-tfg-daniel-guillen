@@ -203,7 +203,7 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "grasped_in_air": RewardTermCfg(
       func=tfg_mdp.grasped_in_air,
-      weight=5.0,
+      weight=3.0,
       params={
         "left_sensor_name": "left_finger_cube_contact",
         "right_sensor_name": "right_finger_cube_contact",

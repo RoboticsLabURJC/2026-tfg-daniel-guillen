@@ -49,16 +49,16 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
     joint_pos = d.qpos[:8] - default_joint_pos
     joint_vel = d.qvel[:8]
 
-    # Objetivo visto desde la pinza: la flecha pinza → objetivo, girada al
-    # sistema de referencia de la pinza (traspuesta de su rotación).
-    ee_pos = d.site('robot/grasp_site').xpos
-    ee_rot = d.site('robot/grasp_site').xmat.reshape(3, 3)
-    goal_position = ee_rot.T @ (target - ee_pos)
+    # Objetivo visto desde la base: la flecha base → objetivo, girada al
+    # sistema de referencia de la base
+    base_pos = d.body('robot/mocap_base').xpos
+    base_rot = d.body('robot/mocap_base').xmat.reshape(3, 3)
+    goal_position = base_rot.T @ (target - base_pos)
 
     obs = np.concatenate([joint_pos, joint_vel, last_action, goal_position])
     
     obs = obs.reshape(1, 26).astype(np.float32)
-    
+
     # Foto de profundidad desde la cámara de la muñeca (en metros).
     renderer.update_scene(d, camera='robot/camera_d405', scene_option=scene_option)
     depth = renderer.render()

@@ -23,6 +23,7 @@ from mjlab.tasks.manipulation import mdp as manipulation_mdp
 from tfg.lift_cube_env_cfg import make_lift_cube_env_cfg
 from tfg.pick_place_env_cfg import make_pick_place_env_cfg
 from mjlab.tasks.manipulation.mdp import MultiCubeLiftingCommandCfg
+from tfg import mdp as tfg_mdp
 
 
 def get_cube_spec(
@@ -41,7 +42,6 @@ def get_cube_spec(
     rgba=rgba,
   )
   return spec
-
 
 def yam_lift_cube_env_cfg(
   play: bool = False,
@@ -176,7 +176,6 @@ def yam_lift_cube_vision_env_cfg(
 
   return cfg
 
-
 def _cube_color(i: int, n: int) -> tuple[float, float, float, float]:
   """Generate a distinct color for cube i of n using HSV hue rotation."""
   h = i / max(n, 1)
@@ -192,6 +191,16 @@ def yam_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   """
   cfg = yam_lift_cube_vision_env_cfg(
     cam_type="depth", play=play, make_base_cfg=make_pick_place_env_cfg
+  )
+  
+  actor_obs = cfg.observations["actor"]
+  actor_obs.terms["goal_position"] = ObservationTermCfg(
+    func=tfg_mdp.target_position_base,
+    params={
+      "command_name": "lift_height",
+      "asset_cfg": SceneEntityCfg("robot", site_names=()),
+    },
+    # NOTE: No noise for goal position.
   )
   
   if play:

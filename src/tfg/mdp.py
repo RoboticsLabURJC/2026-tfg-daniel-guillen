@@ -6,10 +6,21 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from mjlab.entity import Entity
+from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactSensor
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
+  
+_DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
+
+from mjlab.tasks.manipulation.mdp.commands import (
+  LiftingCommand,
+  MultiCubeLiftingCommand,
+)
+
+from mjlab.utils.lab_api.math import quat_apply, quat_inv
 
 
 def finger_contact_grasp(
@@ -86,3 +97,24 @@ def released_at_target(
   )
   near = torch.exp(-distance2 / std**2)
   return near * released * on_ground.float()
+
+
+def target_position_base(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Target position in EE frame."""
+  command = env.command_manager.get_term(command_name)
+  if not isinstance(command, (LiftingCommand, MultiCubeLiftingCommand)):
+    raise TypeError(
+      f"Command '{command_name}' must be a LiftingCommand or "
+      f"MultiCubeLiftingCommand, got {type(command)}"
+    )
+  robot: Entity = env.scene[asset_cfg.name]
+  ee_pos_w = robot.data.root_link_pos_w
+  ee_quat_w = robot.data.root_link_quat_w
+  target_pos_w = command.target_pos
+  target_pos_rel_w = target_pos_w - ee_pos_w
+  target_pos_ee = quat_apply(quat_inv(ee_quat_w), target_pos_rel_w)
+  return target_pos_ee
