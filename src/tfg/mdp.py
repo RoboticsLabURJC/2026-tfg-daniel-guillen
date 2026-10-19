@@ -44,13 +44,20 @@ def grasped_in_air(
   env: ManagerBasedRlEnv,
   left_sensor_name: str,
   right_sensor_name: str,
-  object_ground_sensor_name: str,
+  command_name: str,
+  object_name: str,
+  min_height: float,
 ) -> torch.Tensor:
-  """1 si el objeto está agarrado con los dos dedos y no toca la mesa, 0 si no."""
+  """0-1 si el objeto está agarrado con los dos dedos: crece con la altura sobre
+  el destino y llega a 1 a min_height por encima. 0 si no está agarrado."""
   grasped = finger_contact_grasp(env, left_sensor_name, right_sensor_name)
-  ground: ContactSensor = env.scene[object_ground_sensor_name]
-  on_ground = (ground.data.found > 0).any(dim=-1)
-  return grasped * (~on_ground).float()
+  obj = env.scene[object_name]
+  command = env.command_manager.get_term(command_name)
+  # Cuánto ha subido el cubo sobre el destino, como fracción de min_height
+  # (0 a su altura, 1 a min_height por encima). clamp lo deja entre 0 y 1.
+  height = obj.data.root_link_pos_w[:, 2] - command.target_pos[:, 2]
+  high_enough = torch.clamp(height / min_height, 0.0, 1.0)
+  return grasped * high_enough
 
 
 def target_height_curriculum(
@@ -97,6 +104,25 @@ def released_at_target(
   )
   near = torch.exp(-distance2 / std**2)
   return near * released * on_ground.float()
+
+
+def bring_object_xy_reward(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  object_name: str,
+  std: float,
+) -> torch.Tensor:
+  """0-1: objeto cerca del objetivo solo en horizontal (x, y), sin mirar la altura.
+
+  Como bring_object_reward de mjlab, pero así no castiga llevar el cubo alto.
+  """
+  obj = env.scene[object_name]
+  command = env.command_manager.get_term(command_name)
+  # Distancia al cuadrado cubo-objetivo solo en el plano (x² + y²).
+  distance2 = torch.sum(
+    torch.square(command.target_pos[:, :2] - obj.data.root_link_pos_w[:, :2]), dim=-1
+  )
+  return torch.exp(-distance2 / std**2)
 
 
 def target_position_base(

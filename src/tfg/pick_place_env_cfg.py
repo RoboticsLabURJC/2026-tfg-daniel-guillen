@@ -3,7 +3,6 @@ from mjlab.envs.mdp import dr
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.command_manager import CommandTermCfg
-from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
@@ -193,7 +192,7 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
       },
     ),
     "lift_precise": RewardTermCfg(
-      func=manipulation_mdp.bring_object_reward,
+      func=tfg_mdp.bring_object_xy_reward,
       weight=1.0,
       params={
         "command_name": "lift_height",
@@ -203,11 +202,13 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "grasped_in_air": RewardTermCfg(
       func=tfg_mdp.grasped_in_air,
-      weight=3.0,
+      weight=5.0,
       params={
         "left_sensor_name": "left_finger_cube_contact",
         "right_sensor_name": "right_finger_cube_contact",
-        "object_ground_sensor_name": "cube_ground_contact",
+        "command_name": "lift_height",
+        "object_name": "cube",
+        "min_height": 0.05,
       },
     ),
     "action_rate_l2": RewardTermCfg(func=mdp.action_rate_l2, weight=-0.01),
@@ -218,7 +219,7 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "joint_vel_hinge": RewardTermCfg(
       func=manipulation_mdp.joint_velocity_hinge_penalty,
-      weight=-0.01,
+      weight=-1.0,
       params={
         "max_vel": 0.5,
         "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
@@ -246,19 +247,10 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
   }
 
-  curriculum = {
-    "joint_vel_hinge_weight": CurriculumTermCfg(
-      func=manipulation_mdp.reward_curriculum,
-      params={
-        "reward_name": "joint_vel_hinge",
-        "stages": [
-          {"step": 0, "weight": -0.01},
-          {"step": 500 * 24, "weight": -0.1},
-          {"step": 1000 * 24, "weight": -1.0},
-        ],
-      },
-    ),
-  }
+  # Sin currículum: el castigo por velocidad (joint_vel_hinge) va fijo a -1 desde
+  # el principio. El currículum se reiniciaba cada vez que se continuaba un
+  # entrenamiento y el robot volvía a ir rápido.
+  curriculum = {}
 
   return ManagerBasedRlEnvCfg(
     scene=SceneCfg(
