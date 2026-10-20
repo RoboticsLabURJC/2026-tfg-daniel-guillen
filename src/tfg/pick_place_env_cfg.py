@@ -237,6 +237,20 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
         "std": 0.05,
       },
     ),
+    # Misma recompensa con una campana estrecha (1,5 cm): la ancha lleva el cubo a
+    # la zona y esta premia dejarlo justo en el centro.
+    "released_precise": RewardTermCfg(
+      func=tfg_mdp.released_at_target,
+      weight=5,
+      params={
+        "left_sensor_name": "left_finger_cube_contact",
+        "right_sensor_name": "right_finger_cube_contact",
+        "object_ground_sensor_name": "cube_ground_contact",
+        "command_name": "lift_height",
+        "object_name": "cube",
+        "std": 0.015,
+      },
+    ),
   }
 
   terminations = {
