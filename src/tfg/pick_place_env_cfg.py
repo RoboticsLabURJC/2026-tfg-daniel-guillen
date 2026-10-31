@@ -3,6 +3,7 @@ from mjlab.envs.mdp import dr
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.command_manager import CommandTermCfg
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
@@ -200,9 +201,23 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
         "std": 0.05,
       },
     ),
+    # Dos versiones de "cubo agarrado en el aire" (ver el currículum de abajo):
+    # - grasped_off_ground (fácil): paga en cuanto el cubo se despega de la mesa.
+    #   Sirve para aprender a cogerlo desde cero.
+    # - grasped_in_air (gradual): crece con la altura sobre el destino. Desde cero
+    #   casi nunca paga y el robot aprende a arrastrar el cubo.
+    "grasped_off_ground": RewardTermCfg(
+      func=tfg_mdp.grasped_off_ground,
+      weight=3.0,
+      params={
+        "left_sensor_name": "left_finger_cube_contact",
+        "right_sensor_name": "right_finger_cube_contact",
+        "object_ground_sensor_name": "cube_ground_contact",
+      },
+    ),
     "grasped_in_air": RewardTermCfg(
       func=tfg_mdp.grasped_in_air,
-      weight=5.0,
+      weight=0.0,
       params={
         "left_sensor_name": "left_finger_cube_contact",
         "right_sensor_name": "right_finger_cube_contact",
@@ -219,14 +234,17 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
     "joint_vel_hinge": RewardTermCfg(
       func=manipulation_mdp.joint_velocity_hinge_penalty,
-      weight=-1.0,
+      weight=-0.01,
       params={
         "max_vel": 0.5,
         "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
       },
     ),
+    # released_at_target y released_precise solo pagan si el cubo ha estado
+    # levantado antes (released_after_lift en mdp.py): sin eso el UR5e aprendía
+    # a empujar el cubo hasta el destino en vez de cogerlo.
     "released_at_target": RewardTermCfg(
-      func=tfg_mdp.released_at_target,
+      func=tfg_mdp.released_after_lift,
       weight=10,
       params={
         "left_sensor_name": "left_finger_cube_contact",
@@ -240,7 +258,7 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     # Misma recompensa con una campana estrecha (1,5 cm): la ancha lleva el cubo a
     # la zona y esta premia dejarlo justo en el centro.
     "released_precise": RewardTermCfg(
-      func=tfg_mdp.released_at_target,
+      func=tfg_mdp.released_after_lift,
       weight=5,
       params={
         "left_sensor_name": "left_finger_cube_contact",
@@ -259,12 +277,55 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
       func=manipulation_mdp.illegal_contact,
       params={"sensor_name": "ee_ground_collision", "force_threshold": 10.0},
     ),
+    # Si la física de un robot explota (NaN/Inf), se termina su episodio y se
+    # reinicia antes de calcular las observaciones. Sin esto, un solo robot con
+    # NaN para todo el entrenamiento (pasó en la iteración 9886 del UR5e).
+    "nan_detection": TerminationTermCfg(func=mdp.nan_detection),
   }
 
-  # Sin currículum: el castigo por velocidad (joint_vel_hinge) va fijo a -1 desde
-  # el principio. El currículum se reiniciaba cada vez que se continuaba un
-  # entrenamiento y el robot volvía a ir rápido.
-  curriculum = {}
+  # Currículum para entrenar desde cero en un solo entrenamiento (el YAM llegó a
+  # su red final por fases, continuando a mano). Al continuar un entrenamiento
+  # (--agent.resume) los currículums siguen por donde iban: mjlab guarda el
+  # contador de pasos en cada red.
+  curriculum = {
+    # Castigo por velocidad: suave al principio para que aprenda a coger el cubo
+    # y luego fuerte para que los movimientos sean suaves.
+    "joint_vel_hinge_weight": CurriculumTermCfg(
+      func=manipulation_mdp.reward_curriculum,
+      params={
+        "reward_name": "joint_vel_hinge",
+        "stages": [
+          {"step": 0, "weight": -0.01},
+          {"step": 500 * 24, "weight": -0.1},
+          {"step": 1000 * 24, "weight": -1.0},
+        ],
+      },
+    ),
+    # Primero la versión fácil para aprender a coger el cubo y, a partir de la
+    # iteración 6000, se pasa poco a poco a la gradual para llevarlo alto.
+    "grasped_off_ground_weight": CurriculumTermCfg(
+      func=manipulation_mdp.reward_curriculum,
+      params={
+        "reward_name": "grasped_off_ground",
+        "stages": [
+          {"step": 0, "weight": 3.0},
+          {"step": 6000 * 24, "weight": 1.5},
+          {"step": 7000 * 24, "weight": 0.0},
+        ],
+      },
+    ),
+    "grasped_in_air_weight": CurriculumTermCfg(
+      func=manipulation_mdp.reward_curriculum,
+      params={
+        "reward_name": "grasped_in_air",
+        "stages": [
+          {"step": 0, "weight": 0.0},
+          {"step": 6000 * 24, "weight": 2.5},
+          {"step": 7000 * 24, "weight": 5.0},
+        ],
+      },
+    ),
+  }
 
   return ManagerBasedRlEnvCfg(
     scene=SceneCfg(

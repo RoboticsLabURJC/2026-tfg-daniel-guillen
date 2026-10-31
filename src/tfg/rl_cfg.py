@@ -111,6 +111,13 @@ def yam_pick_place_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   return cfg
 
 
+def ur5e_pick_place_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  """Igual que el pick and place del YAM, guardando en otra carpeta de logs."""
+  cfg = yam_pick_place_ppo_runner_cfg()
+  cfg.experiment_name = "ur5e_pick_place"
+  return cfg
+
+
 def yam_multi_cube_seg_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(

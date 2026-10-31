@@ -24,7 +24,7 @@ from tfg.lift_cube_env_cfg import make_lift_cube_env_cfg
 from tfg.pick_place_env_cfg import make_pick_place_env_cfg
 from mjlab.tasks.manipulation.mdp import MultiCubeLiftingCommandCfg
 from tfg import mdp as tfg_mdp
-
+from tfg.ur5e_constants import UR5E_ACTION_SCALE, get_ur5e_robot_cfg
 
 def get_cube_spec(
   cube_size: float = 0.02,
@@ -207,6 +207,94 @@ def yam_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.commands["lift_height"].target_position_range.z = (0.02, 0.02)
     cfg.commands["lift_height"].resampling_time_range = (4.0, 6.0)
   
+  return cfg
+
+def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Pick and place con el UR5e (pinza Robotiq 2F-85 y cámara D405).
+
+  Parte de la tarea del YAM y cambia solo lo que es propio del robot.
+  """
+  cfg = yam_pick_place_env_cfg(play=play)
+
+  cfg.scene.entities["robot"] = get_ur5e_robot_cfg()
+  
+  joint_pos_action = cfg.actions["joint_pos"]
+  assert isinstance(joint_pos_action, JointPositionActionCfg)
+  joint_pos_action.scale = UR5E_ACTION_SCALE
+
+  fingertip_geoms = r"gripper_.*_pad[12]"
+  cfg.events["fingertip_friction_slide"].params[
+    "asset_cfg"
+  ].geom_names = fingertip_geoms
+  cfg.events["fingertip_friction_spin"].params["asset_cfg"].geom_names = fingertip_geoms
+  cfg.events["fingertip_friction_roll"].params["asset_cfg"].geom_names = fingertip_geoms
+
+  assert cfg.scene.sensors is not None
+  for sensor in cfg.scene.sensors:
+    if sensor.name == "ee_ground_collision":
+      assert isinstance(sensor, ContactSensorCfg)
+      sensor.primary.pattern = "wrist_3_link"
+    elif sensor.name == "left_finger_cube_contact":
+      assert isinstance(sensor, ContactSensorCfg)
+      sensor.primary.pattern = "gripper_left_pad"
+    elif sensor.name == "right_finger_cube_contact":
+      assert isinstance(sensor, ContactSensorCfg)
+      sensor.primary.pattern = "gripper_right_pad"
+
+  # Penalizaciones de articulaciones: solo las que mueve la red. Las piezas
+  # pasivas de la pinza (coupler, spring_link, follower) trabajan pegadas a su
+  # tope y se mueven solas al cerrar; castigarlas no tiene sentido.
+  arm_joints = ("shoulder_.*", "elbow_joint", "wrist_.*")
+  cfg.rewards["joint_pos_limits"].params["asset_cfg"].joint_names = arm_joints
+  # La pinza tampoco va en el castigo de velocidad: sus dedos giran y se
+  # cierran a ~5.7 rad/s (el umbral es 0.5), así que cerrarla costaba mucho
+  # más de lo que da coger el cubo y la red aprendía a no moverla. En el YAM
+  # el dedo se desliza a ~0.03 m/s y nunca llegaba al umbral.
+  cfg.rewards["joint_vel_hinge"].params["asset_cfg"].joint_names = arm_joints
+  # Castigo por velocidad más fuerte que en el YAM: con −1 el UR5e movía las
+  # articulaciones a 1–2.6 rad/s (umbral 0.5) y a veces se le caía el cubo al
+  # arrancar hacia el destino. Se sube cuando ya sabe coger y llevar el cubo.
+  # En play no hay currículums (cfg.curriculum vacío).
+  if not play:
+    cfg.curriculum["joint_vel_hinge_weight"].params["stages"] = [
+      {"step": 0, "weight": -0.01},
+      {"step": 500 * 24, "weight": -0.1},
+      {"step": 1000 * 24, "weight": -1.0},
+      {"step": 2000 * 24, "weight": -3.0},
+      {"step": 4000 * 24, "weight": -10.0},
+    ]
+
+  # Acercarse al cubo con una campana estrecha (5 cm en vez de 20): con la ancha,
+  # quedarse a 5 cm ya daba el 94 % del premio y no centraba la pinza sobre el
+  # cubo, así que nunca llegaba a cogerlo.
+  cfg.rewards["lift"].params["reaching_std"] = 0.05
+
+  # Con el cubo ya en el destino, la pinza abría y cerraba los dedos ~5 veces
+  # por segundo porque no le costaba nada. Ahora moverla le cuesta.
+  cfg.rewards["gripper_still"] = RewardTermCfg(
+    func=tfg_mdp.gripper_vel_after_place,
+    weight=-0.1,
+    params={
+      "left_sensor_name": "left_finger_cube_contact",
+      "right_sensor_name": "right_finger_cube_contact",
+      "object_ground_sensor_name": "cube_ground_contact",
+      "command_name": "lift_height",
+      "object_name": "cube",
+      "std": 0.05,
+      "asset_cfg": SceneEntityCfg("robot", joint_names=("gripper_left_driver_joint",)),
+    },
+  )
+
+  # Zonas del cubo y del destino: mismo tamaño que en el YAM, pero centradas
+  # delante de la pinza en reposo (x = 0.45).
+  command = cfg.commands["lift_height"]
+  command.object_pose_range.x = (0.35, 0.55)
+  command.object_pose_range.y = (-0.2, -0.05)
+  command.target_position_range.x = (0.35, 0.55)
+  command.target_position_range.y = (0.05, 0.2)
+
+  cfg.viewer.body_name = "base"
+
   return cfg
 
 

@@ -12,6 +12,7 @@ from mjlab.sensor import ContactSensor
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
+  from mjlab.managers.reward_manager import RewardTermCfg
   
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
 
@@ -60,6 +61,23 @@ def grasped_in_air(
   return grasped * high_enough
 
 
+def grasped_off_ground(
+  env: ManagerBasedRlEnv,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_ground_sensor_name: str,
+) -> torch.Tensor:
+  """1 si el objeto está agarrado con los dos dedos y no toca la mesa, 0 si no.
+
+  Versión fácil de grasped_in_air (la primera que tuvo el YAM, commit 3256aba):
+  paga en cuanto el objeto se despega de la mesa, sin mirar la altura.
+  """
+  grasped = finger_contact_grasp(env, left_sensor_name, right_sensor_name)
+  ground: ContactSensor = env.scene[object_ground_sensor_name]
+  on_ground = (ground.data.found > 0).any(dim=-1)
+  return grasped * (~on_ground).float()
+
+
 def target_height_curriculum(
   env: ManagerBasedRlEnv,
   env_ids: torch.Tensor,
@@ -106,6 +124,26 @@ def released_at_target(
   return near * released * on_ground.float()
 
 
+def gripper_vel_after_place(
+  env: ManagerBasedRlEnv,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_ground_sensor_name: str,
+  command_name: str,
+  object_name: str,
+  std: float,
+  asset_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+  """Velocidad² de la pinza, solo con el cubo ya soltado en el destino."""
+  placed = released_at_target(
+    env, left_sensor_name, right_sensor_name, object_ground_sensor_name,
+    command_name, object_name, std,
+  )
+  robot: Entity = env.scene[asset_cfg.name]
+  vel = robot.data.joint_vel[:, asset_cfg.joint_ids]
+  return placed * torch.sum(torch.square(vel), dim=-1)
+
+
 def bring_object_xy_reward(
   env: ManagerBasedRlEnv,
   command_name: str,
@@ -125,12 +163,58 @@ def bring_object_xy_reward(
   return torch.exp(-distance2 / std**2)
 
 
+class released_after_lift:
+  """released_at_target, pero solo si el cubo ha estado levantado antes.
+
+  Cada robot tiene una casilla "lo he levantado": se marca cuando tiene el cubo
+  agarrado y despegado de la mesa (grasped_off_ground) y se vacía al empezar un
+  episodio o cuando el comando pone un cubo y un destino nuevos. Así empujar el
+  cubo hasta el destino no da puntos: hay que cogerlo, llevarlo y soltarlo.
+  Hace falta una clase (y no una función) para guardar la casilla de un paso a
+  otro; mjlab llama a reset() al empezar cada episodio.
+  """
+
+  def __init__(self, cfg: RewardTermCfg, env: ManagerBasedRlEnv):
+    del cfg  # No se usa.
+    self.lifted = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+    # Último destino visto: si cambia, el comando ha recolocado el cubo.
+    self.last_target = torch.zeros(env.num_envs, 3, device=env.device)
+
+  def __call__(
+    self,
+    env: ManagerBasedRlEnv,
+    left_sensor_name: str,
+    right_sensor_name: str,
+    object_ground_sensor_name: str,
+    command_name: str,
+    object_name: str,
+    std: float,
+  ) -> torch.Tensor:
+    command = env.command_manager.get_term(command_name)
+    new_target = (command.target_pos != self.last_target).any(dim=-1)
+    self.lifted[new_target] = False
+    self.last_target[:] = command.target_pos
+
+    lifted_now = grasped_off_ground(
+      env, left_sensor_name, right_sensor_name, object_ground_sensor_name
+    )
+    self.lifted |= lifted_now > 0
+
+    return self.lifted * released_at_target(
+      env, left_sensor_name, right_sensor_name, object_ground_sensor_name,
+      command_name, object_name, std,
+    )
+
+  def reset(self, env_ids: torch.Tensor) -> None:
+    self.lifted[env_ids] = False
+
+
 def target_position_base(
   env: ManagerBasedRlEnv,
   command_name: str,
   asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
 ) -> torch.Tensor:
-  """Target position in EE frame."""
+  """Target position in robot base (root link) frame."""
   command = env.command_manager.get_term(command_name)
   if not isinstance(command, (LiftingCommand, MultiCubeLiftingCommand)):
     raise TypeError(
@@ -138,9 +222,9 @@ def target_position_base(
       f"MultiCubeLiftingCommand, got {type(command)}"
     )
   robot: Entity = env.scene[asset_cfg.name]
-  ee_pos_w = robot.data.root_link_pos_w
-  ee_quat_w = robot.data.root_link_quat_w
+  root_link_pos_w = robot.data.root_link_pos_w
+  root_link_quat_w = robot.data.root_link_quat_w
   target_pos_w = command.target_pos
-  target_pos_rel_w = target_pos_w - ee_pos_w
-  target_pos_ee = quat_apply(quat_inv(ee_quat_w), target_pos_rel_w)
-  return target_pos_ee
+  target_pos_rel_w = target_pos_w - root_link_pos_w
+  target_pos_root_link = quat_apply(quat_inv(root_link_quat_w), target_pos_rel_w)
+  return target_pos_root_link
