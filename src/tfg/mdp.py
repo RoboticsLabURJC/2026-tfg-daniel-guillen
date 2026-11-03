@@ -12,6 +12,7 @@ from mjlab.sensor import ContactSensor
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
+  from mjlab.managers.metrics_manager import MetricsTermCfg
   from mjlab.managers.reward_manager import RewardTermCfg
   
 _DEFAULT_ASSET_CFG = SceneEntityCfg("robot")
@@ -78,6 +79,28 @@ def grasped_off_ground(
   return grasped * (~on_ground).float()
 
 
+def grasp_centered(
+  env: ManagerBasedRlEnv,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_name: str,
+  std: float,
+  asset_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+  """0-1: objeto agarrado con los dos dedos y centrado entre las yemas.
+
+  Mide la distancia en horizontal (x, y) entre el centro de las yemas
+  (asset_cfg.geom_names) y el centro del objeto: 1 centrado, 0.37 a `std`.
+  Agarrarlo cerca del borde hace que se escurra al levantarlo.
+  """
+  grasped = finger_contact_grasp(env, left_sensor_name, right_sensor_name)
+  robot: Entity = env.scene[asset_cfg.name]
+  pads = robot.data.geom_pos_w[:, asset_cfg.geom_ids].mean(dim=1)
+  obj = env.scene[object_name].data.root_link_pos_w
+  distance2 = torch.sum(torch.square(pads[:, :2] - obj[:, :2]), dim=-1)
+  return grasped * torch.exp(-distance2 / std**2)
+
+
 def target_height_curriculum(
   env: ManagerBasedRlEnv,
   env_ids: torch.Tensor,
@@ -132,16 +155,18 @@ def gripper_vel_after_place(
   command_name: str,
   object_name: str,
   std: float,
+  max_value: float,
   asset_cfg: SceneEntityCfg,
 ) -> torch.Tensor:
-  """Velocidad² de la pinza, solo con el cubo ya soltado en el destino."""
+  """Velocidad² de la pinza (como mucho max_value), con el cubo ya soltado."""
   placed = released_at_target(
     env, left_sensor_name, right_sensor_name, object_ground_sensor_name,
     command_name, object_name, std,
   )
   robot: Entity = env.scene[asset_cfg.name]
   vel = robot.data.joint_vel[:, asset_cfg.joint_ids]
-  return placed * torch.sum(torch.square(vel), dim=-1)
+  vel2 = torch.sum(torch.square(vel), dim=-1)
+  return placed * torch.clamp(vel2, max=max_value)
 
 
 def bring_object_xy_reward(
@@ -207,6 +232,62 @@ class released_after_lift:
 
   def reset(self, env_ids: torch.Tensor) -> None:
     self.lifted[env_ids] = False
+
+
+class task_success_rate:
+  """Métrica: fracción de encargos terminados con el cubo bien colocado.
+
+  Un encargo termina cuando el comando cambia el destino de sitio. Justo
+  antes, se mira si el cubo estaba soltado, apoyado y a menos de
+  `threshold` del destino. El último encargo del episodio no cuenta porque
+  se corta a medias. Solo mide: no cambia el entrenamiento.
+  """
+
+  def __init__(self, cfg: MetricsTermCfg, env: ManagerBasedRlEnv):
+    del cfg  # No se usa.
+    n = env.num_envs
+    self.completed = torch.zeros(n, device=env.device)  # Encargos terminados.
+    self.successes = torch.zeros(n, device=env.device)  # De ellos, bien hechos.
+    self.was_placed = torch.zeros(n, dtype=torch.bool, device=env.device)
+    self.last_target = torch.zeros(n, 3, device=env.device)
+    # Tras un reset el destino cambia, pero no termina ningún encargo.
+    self.fresh = torch.ones(n, dtype=torch.bool, device=env.device)
+
+  def __call__(
+    self,
+    env: ManagerBasedRlEnv,
+    left_sensor_name: str,
+    right_sensor_name: str,
+    object_ground_sensor_name: str,
+    command_name: str,
+    object_name: str,
+    threshold: float,
+  ) -> torch.Tensor:
+    command = env.command_manager.get_term(command_name)
+    new_target = (command.target_pos != self.last_target).any(dim=-1)
+    finished = new_target & ~self.fresh
+    self.completed += finished.float()
+    self.successes += (finished & self.was_placed).float()
+    self.fresh &= ~new_target
+    self.last_target[:] = command.target_pos
+
+    # ¿Está ahora el cubo bien colocado? Se usa si el encargo acaba en el
+    # siguiente paso (al cambiar de encargo el cubo se mueve a su nuevo sitio).
+    grasped = finger_contact_grasp(env, left_sensor_name, right_sensor_name) > 0
+    ground: ContactSensor = env.scene[object_ground_sensor_name]
+    on_ground = (ground.data.found > 0).any(dim=-1)
+    error = torch.norm(
+      command.target_pos - env.scene[object_name].data.root_link_pos_w, dim=-1
+    )
+    self.was_placed = (error < threshold) & on_ground & ~grasped
+
+    return self.successes / torch.clamp(self.completed, min=1.0)
+
+  def reset(self, env_ids: torch.Tensor) -> None:
+    self.completed[env_ids] = 0.0
+    self.successes[env_ids] = 0.0
+    self.was_placed[env_ids] = False
+    self.fresh[env_ids] = True
 
 
 def target_position_base(

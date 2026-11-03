@@ -24,6 +24,7 @@ from tfg.lift_cube_env_cfg import make_lift_cube_env_cfg
 from tfg.pick_place_env_cfg import make_pick_place_env_cfg
 from mjlab.tasks.manipulation.mdp import MultiCubeLiftingCommandCfg
 from tfg import mdp as tfg_mdp
+from tfg.actions import GripperSpeedLimitActionCfg
 from tfg.ur5e_constants import UR5E_ACTION_SCALE, get_ur5e_robot_cfg
 
 def get_cube_spec(
@@ -220,7 +221,18 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   
   joint_pos_action = cfg.actions["joint_pos"]
   assert isinstance(joint_pos_action, JointPositionActionCfg)
-  joint_pos_action.scale = UR5E_ACTION_SCALE
+  # La pinza se mueve como la Robotiq 2F-85 real: a 150 mm/s como mucho
+  # (85 mm de recorrido = 0.8 rad del dedo → 1.41 rad/s, se cierra en ~0.6 s).
+  # Sin límite se cerraba en 0.06 s, diez veces más rápido que la real.
+  cfg.actions["joint_pos"] = GripperSpeedLimitActionCfg(
+    entity_name=joint_pos_action.entity_name,
+    actuator_names=joint_pos_action.actuator_names,
+    scale=UR5E_ACTION_SCALE,
+    use_default_offset=True,
+    gripper_joint="gripper_left_driver_joint",
+    max_speed=1.41,
+    gripper_range=(0.0, 0.8),
+  )
 
   fingertip_geoms = r"gripper_.*_pad[12]"
   cfg.events["fingertip_friction_slide"].params[
@@ -254,6 +266,7 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # Castigo por velocidad más fuerte que en el YAM: con −1 el UR5e movía las
   # articulaciones a 1–2.6 rad/s (umbral 0.5) y a veces se le caía el cubo al
   # arrancar hacia el destino. Se sube cuando ya sabe coger y llevar el cubo.
+  # Con −10 seguía pareciendo brusco al llevarlo lejos (zonas grandes): −15.
   # En play no hay currículums (cfg.curriculum vacío).
   if not play:
     cfg.curriculum["joint_vel_hinge_weight"].params["stages"] = [
@@ -262,6 +275,7 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       {"step": 1000 * 24, "weight": -1.0},
       {"step": 2000 * 24, "weight": -3.0},
       {"step": 4000 * 24, "weight": -10.0},
+      {"step": 5000 * 24, "weight": -15.0},
     ]
 
   # Acercarse al cubo con una campana estrecha (5 cm en vez de 20): con la ancha,
@@ -271,6 +285,9 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   # Con el cubo ya en el destino, la pinza abría y cerraba los dedos ~5 veces
   # por segundo porque no le costaba nada. Ahora moverla le cuesta.
+  # Tope de 16 (unos 4 rad/s, lo que mueve los dedos al bailar): al soltar,
+  # los dedos siguen abriéndose a ~12 rad/s unos pasos después de dejar de
+  # tocar el cubo y, sin tope, eso costaba hasta −25 en un solo paso.
   cfg.rewards["gripper_still"] = RewardTermCfg(
     func=tfg_mdp.gripper_vel_after_place,
     weight=-0.1,
@@ -281,17 +298,21 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       "command_name": "lift_height",
       "object_name": "cube",
       "std": 0.05,
+      "max_value": 16.0,
       "asset_cfg": SceneEntityCfg("robot", joint_names=("gripper_left_driver_joint",)),
     },
   )
 
-  # Zonas del cubo y del destino: mismo tamaño que en el YAM, pero centradas
-  # delante de la pinza en reposo (x = 0.45).
+  # Zonas del cubo y del destino: la misma para los dos, dentro de lo que ve
+  # la cámara de la muñeca en reposo (x 0.31–0.66, |y| 0.14 cerca y 0.19
+  # lejos), para que siempre vea el cubo al empezar. Antes eran dos zonas
+  # separadas (cubo a la derecha, y −0.2 a −0.05; destino a la izquierda,
+  # y 0.05 a 0.2; x 0.35–0.55).
   command = cfg.commands["lift_height"]
-  command.object_pose_range.x = (0.35, 0.55)
-  command.object_pose_range.y = (-0.2, -0.05)
-  command.target_position_range.x = (0.35, 0.55)
-  command.target_position_range.y = (0.05, 0.2)
+  command.object_pose_range.x = (0.33, 0.62)
+  command.object_pose_range.y = (-0.15, 0.15)
+  command.target_position_range.x = (0.33, 0.62)
+  command.target_position_range.y = (-0.15, 0.15)
 
   cfg.viewer.body_name = "base"
 

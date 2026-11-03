@@ -5,6 +5,7 @@ from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.command_manager import CommandTermCfg
 from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.event_manager import EventTermCfg
+from mjlab.managers.metrics_manager import MetricsTermCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
@@ -327,6 +328,25 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     ),
   }
 
+  # Métricas: no cambian el entrenamiento, solo lo que se ve en TensorBoard.
+  # task_success cuenta cada encargo justo al terminar (ver mdp.py); la de
+  # mjlab (Metrics/lift_height/at_goal) mira el último instante del episodio
+  # y cuenta como fallo a los robots que están a mitad de un encargo.
+  metrics = {
+    "task_success": MetricsTermCfg(
+      func=tfg_mdp.task_success_rate,
+      reduce="last",
+      params={
+        "left_sensor_name": "left_finger_cube_contact",
+        "right_sensor_name": "right_finger_cube_contact",
+        "object_ground_sensor_name": "cube_ground_contact",
+        "command_name": "lift_height",
+        "object_name": "cube",
+        "threshold": 0.02,
+      },
+    ),
+  }
+
   return ManagerBasedRlEnvCfg(
     scene=SceneCfg(
       terrain=TerrainEntityCfg(terrain_type="plane"),
@@ -342,6 +362,7 @@ def make_pick_place_env_cfg() -> ManagerBasedRlEnvCfg:
     rewards=rewards,
     terminations=terminations,
     curriculum=curriculum,
+    metrics=metrics,
     viewer=ViewerConfig(
       origin_type=ViewerConfig.OriginType.ASSET_BODY,
       entity_name="robot",
