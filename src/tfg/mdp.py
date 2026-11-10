@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import torch
@@ -9,6 +10,8 @@ import torch
 from mjlab.entity import Entity
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import ContactSensor
+from mjlab.tasks.manipulation import mdp as manipulation_mdp
+from tfg.red_giro import RedGiro
 
 if TYPE_CHECKING:
   from mjlab.envs import ManagerBasedRlEnv
@@ -22,7 +25,7 @@ from mjlab.tasks.manipulation.mdp.commands import (
   MultiCubeLiftingCommand,
 )
 
-from mjlab.utils.lab_api.math import quat_apply, quat_inv
+from mjlab.utils.lab_api.math import euler_xyz_from_quat, quat_apply, quat_inv
 
 
 def finger_contact_grasp(
@@ -309,3 +312,127 @@ def target_position_base(
   target_pos_rel_w = target_pos_w - root_link_pos_w
   target_pos_root_link = quat_apply(quat_inv(root_link_quat_w), target_pos_rel_w)
   return target_pos_root_link
+
+def gripper_cube_alignment(
+  env: ManagerBasedRlEnv,
+  object_name: str,
+  left_sensor_name: str,
+  right_sensor_name: str,
+  object_ground_sensor_name: str,
+  asset_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+  """Pinza alineada con el cubo (1 alineada con sus caras, 0 en diagonal), solo
+  con el cubo cogido y levantado: premia cómo lo ha cogido, no estar alineada
+  esperando encima del cubo."""
+  robot: Entity = env.scene[asset_cfg.name]
+  gripper_quat = robot.data.site_quat_w[:, asset_cfg.site_ids[0]]
+  obj = env.scene[object_name].data
+
+  # Giro alrededor del eje vertical (yaw) de la pinza y del cubo.
+  _, _, gripper_yaw = euler_xyz_from_quat(gripper_quat)
+  _, _, cube_yaw = euler_xyz_from_quat(obj.root_link_quat_w)
+
+  diff = (gripper_yaw - cube_yaw) % (math.pi / 2) # De 0° a 90°
+  error = torch.minimum(diff, math.pi/2 - diff) # 0°–45°
+  aligned = 1 - error / (math.pi / 4) # 0 en diagonal 45º, 1 alineada 0º.
+
+  # Solo con el cubo en el aire: flotar alineada encima del cubo ya no paga.
+  lifted = grasped_off_ground(
+    env, left_sensor_name, right_sensor_name, object_ground_sensor_name
+  )
+  return lifted * aligned
+
+def gripper_cube_yaw(env, object_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+  """Giro del cubo respecto a la pinza, como (sin, cos) de 4 veces la diferencia."""
+  robot: Entity = env.scene[asset_cfg.name]
+  gripper_quat = robot.data.site_quat_w[:, asset_cfg.site_ids[0]]
+  _, _, gripper_yaw = euler_xyz_from_quat(gripper_quat)
+  _, _, cube_yaw = euler_xyz_from_quat(env.scene[object_name].data.root_link_quat_w)
+  diff = 4 * (gripper_yaw - cube_yaw)
+  return torch.stack([torch.sin(diff), torch.cos(diff)], dim=-1)
+
+_red_giro = None  # la red se carga una sola vez, la primera vez que se usa
+
+def estimated_cube_yaw(
+  env: ManagerBasedRlEnv, sensor_name: str, cutoff_distance: float, pesos: str
+) -> torch.Tensor:
+  """Giro del cubo respecto a la pinza que adivina la red de visión, (sin, cos) de 4·giro."""
+  global _red_giro
+  if _red_giro is None:
+    # Montar la red vacía en la GPU, cargarle los pesos entrenados y ponerla
+    # en modo examen (tutorial de PyTorch "Save and Load the Model").
+    _red_giro = RedGiro().to(env.device)
+    _red_giro.load_state_dict(torch.load(pesos, map_location=env.device, weights_only=True))
+    _red_giro.eval()
+  # La misma imagen que ve el actor (y con la que se entrenó la red).
+  imagen = manipulation_mdp.camera_depth(env, sensor_name, cutoff_distance)
+  # Pasarla por la red sin entrenarla y devolver lo que dice: (N, 2).
+  with torch.no_grad():
+    return _red_giro(imagen)
+  
+class alignment_progress:
+  """Recompensa por potencial (Ng et al., 1999): paga por acercarse al cubo con
+  la pinza alineada respecto al paso anterior. Quedarse quieta no cobra."""
+
+  def __init__(self, cfg, env):
+    # Potencial del paso anterior de cada robot.
+    self.anterior = torch.zeros(env.num_envs, device=env.device)
+    # Robots que acaban de empezar episodio (aún no tienen paso anterior).
+    self.nuevo = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+
+  def reset(self, env_ids=None):
+    if env_ids is None:
+      env_ids = slice(None)
+    self.nuevo[env_ids] = True
+
+  def __call__(self, env, object_name, std, gamma, asset_cfg):
+    robot = env.scene[asset_cfg.name]
+    obj = env.scene[object_name].data
+    pinza = asset_cfg.site_ids[0]
+    # Cerca del cubo: 1 encima, baja a 0 al alejarse (campana de std metros).
+    distancia = (robot.data.site_pos_w[:, pinza] - obj.root_link_pos_w).norm(dim=-1)
+    cerca = torch.exp(-(distancia / std) ** 2)
+    # Alineada: igual que en gripper_cube_alignment (1 alineada, 0 en diagonal).
+    _, _, gripper_yaw = euler_xyz_from_quat(robot.data.site_quat_w[:, pinza])
+    _, _, cube_yaw = euler_xyz_from_quat(obj.root_link_quat_w)
+    diff = (gripper_yaw - cube_yaw) % (math.pi / 2)
+    alineada = 1 - torch.minimum(diff, math.pi / 2 - diff) / (math.pi / 4)
+    potencial = cerca * alineada
+    # Lo que ha mejorado desde el paso anterior (0 en el primer paso del episodio).
+    mejora = gamma * potencial - self.anterior
+    mejora[self.nuevo] = 0.0
+    self.anterior = potencial
+    self.nuevo[:] = False
+    # mjlab multiplica cada recompensa por step_dt: se divide para que cuente
+    # la mejora entera.
+    return mejora / env.step_dt
+
+
+class first_touch_alignment:
+  """Paga una sola vez por episodio, cuando los dos dedos tocan el cubo por
+  primera vez: 1 si la pinza llega alineada, 0 en diagonal. Se mide al tocarlo,
+  así premia girar la muñeca antes de coger y no se puede repetir."""
+
+  def __init__(self, cfg, env):
+    # Robots que ya han cobrado en este episodio.
+    self.pagado = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+
+  def reset(self, env_ids=None):
+    if env_ids is None:
+      env_ids = slice(None)
+    self.pagado[env_ids] = False
+
+  def __call__(self, env, object_name, left_sensor_name, right_sensor_name, asset_cfg):
+    toca = finger_contact_grasp(env, left_sensor_name, right_sensor_name) > 0
+    primera_vez = toca & ~self.pagado
+    self.pagado |= toca
+    # Alineada: 1 alineada, 0 con 20° o más de error. Con 45° (como en
+    # gripper_cube_alignment) tocar 13° torcido ya cobraba el 71 % y no
+    # aprendía a girar hacia uno de los lados.
+    robot = env.scene[asset_cfg.name]
+    _, _, gripper_yaw = euler_xyz_from_quat(robot.data.site_quat_w[:, asset_cfg.site_ids[0]])
+    _, _, cube_yaw = euler_xyz_from_quat(env.scene[object_name].data.root_link_quat_w)
+    diff = (gripper_yaw - cube_yaw) % (math.pi / 2)
+    alineada = (1 - torch.minimum(diff, math.pi / 2 - diff) / math.radians(20)).clamp(min=0)
+    # Se divide entre step_dt para que el peso sean los puntos que cobra.
+    return primera_vez.float() * alineada / env.step_dt

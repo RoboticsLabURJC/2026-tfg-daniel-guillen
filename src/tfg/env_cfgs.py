@@ -26,6 +26,7 @@ from mjlab.tasks.manipulation.mdp import MultiCubeLiftingCommandCfg
 from tfg import mdp as tfg_mdp
 from tfg.actions import GripperSpeedLimitActionCfg
 from tfg.ur5e_constants import UR5E_ACTION_SCALE, get_ur5e_robot_cfg
+from mjlab.managers.curriculum_manager import CurriculumTermCfg
 
 def get_cube_spec(
   cube_size: float = 0.02,
@@ -277,11 +278,73 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       {"step": 4000 * 24, "weight": -10.0},
       {"step": 5000 * 24, "weight": -15.0},
     ]
+    cfg.curriculum["align_progress_weight"] = CurriculumTermCfg(
+      func=manipulation_mdp.reward_curriculum,
+      params={
+        "reward_name": "align_progress",
+        "stages": [
+          {"step": 0, "weight": 0.0},
+          {"step": 3000 * 24, "weight": 5.0},
+        ],
+      },
+    )
+    cfg.curriculum["first_touch_aligned_weight"] = CurriculumTermCfg(
+      func=manipulation_mdp.reward_curriculum,
+      params={
+        "reward_name": "first_touch_aligned",
+        "stages": [
+          {"step": 0, "weight": 0.0},
+          {"step": 3000 * 24, "weight": 20.0},
+        ],
+      },
+    )
 
   # Acercarse al cubo con una campana estrecha (5 cm en vez de 20): con la ancha,
   # quedarse a 5 cm ya daba el 94 % del premio y no centraba la pinza sobre el
   # cubo, así que nunca llegaba a cogerlo.
   cfg.rewards["lift"].params["reaching_std"] = 0.05
+
+  # Coger el cubo alineado (dedos sobre dos caras, no en las esquinas).
+  # Paga solo con el cubo levantado: si pagaba antes, flotaba encima sin cogerlo.
+  # Peso 2: con 5 sostenía el cubo en el aire en vez de soltarlo.
+  cfg.rewards["grasp_aligned"] = RewardTermCfg(
+    func=tfg_mdp.gripper_cube_alignment,
+    weight=2.0,
+    params={
+      "object_name": "cube",
+      "left_sensor_name": "left_finger_cube_contact",
+      "right_sensor_name": "right_finger_cube_contact",
+      "object_ground_sensor_name": "cube_ground_contact",
+      "asset_cfg": SceneEntityCfg("robot", site_names=("grasp_site",)),
+    },
+  )
+  
+  # Ir alineándose al acercarse al cubo (recompensa por potencial): paga por
+  # mejorar la alineación, no por estar alineada, así que flotar no cobra.
+  # Peso 0: se enciende con el currículum cuando ya sabe la tarea.
+  cfg.rewards["align_progress"] = RewardTermCfg(
+    func=tfg_mdp.alignment_progress,
+    weight=0.0,
+    params={
+      "object_name": "cube",
+      "std": 0.15,
+      "gamma": 0.99,  # el mismo gamma de PPO (rl_cfg.py)
+      "asset_cfg": SceneEntityCfg("robot", site_names=("grasp_site",)),
+    },
+  )
+
+  # Llegar al cubo con la pinza alineada: paga una vez por episodio, al tocarlo
+  # con los dos dedos. Hace que alinearse valga de verdad (~10 % del episodio).
+  cfg.rewards["first_touch_aligned"] = RewardTermCfg(
+    func=tfg_mdp.first_touch_alignment,
+    weight=0.0,  # se enciende con el currículum
+    params={
+      "object_name": "cube",
+      "left_sensor_name": "left_finger_cube_contact",
+      "right_sensor_name": "right_finger_cube_contact",
+      "asset_cfg": SceneEntityCfg("robot", site_names=("grasp_site",)),
+    },
+  )
 
   # Con el cubo ya en el destino, la pinza abría y cerraba los dedos ~5 veces
   # por segundo porque no le costaba nada. Ahora moverla le cuesta.
@@ -315,6 +378,23 @@ def ur5e_pick_place_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   command.target_position_range.y = (-0.15, 0.15)
 
   cfg.viewer.body_name = "base"
+  
+  # Giro exacto del cubo, solo para el crítico (el robot real no lo tiene).
+  cube_yaw = ObservationTermCfg(
+    func=tfg_mdp.gripper_cube_yaw,
+    params={"object_name": "cube", "asset_cfg": SceneEntityCfg("robot", site_names=("grasp_site",))},
+  )
+  cfg.observations["critic"].terms["cube_yaw"] = cube_yaw
+  
+  # Giro del cubo según la red de visión (red_giro.py): el robot real sí lo tiene.
+  cfg.observations["actor"].terms["cube_yaw_vision"] = ObservationTermCfg(
+    func=tfg_mdp.estimated_cube_yaw,
+    params={
+      "sensor_name": "camera_d405",
+      "cutoff_distance": 0.5,  # igual que la cámara del actor
+      "pesos": "src/tfg/red_giro.pt",
+    },
+  )
 
   return cfg
 

@@ -1,5 +1,3 @@
-"""Acciones propias de la tarea que no trae mjlab."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,13 +25,13 @@ class GripperSpeedLimitActionCfg(JointPositionActionCfg):
 
   def build(self, env: ManagerBasedRlEnv) -> GripperSpeedLimitAction:
     return GripperSpeedLimitAction(self, env)
-
-
+  
+  
 class GripperSpeedLimitAction(JointPositionAction):
   cfg: GripperSpeedLimitActionCfg
 
   def __init__(self, cfg: GripperSpeedLimitActionCfg, env: ManagerBasedRlEnv):
-    super().__init__(cfg=cfg, env=env)
+    super().__init__(cfg=cfg, env=env) # Primero se ejecuta el actions de mjlab
     self._gripper = self._target_names.index(cfg.gripper_joint)  # Columna de la pinza.
     self._max_step = cfg.max_speed * env.step_dt  # Lo que puede avanzar en un paso.
     self._gripper_target = torch.zeros(self.num_envs, device=self.device)
@@ -54,3 +52,4 @@ class GripperSpeedLimitAction(JointPositionAction):
     # Al empezar un episodio, el objetivo de la pinza empieza donde está la pinza.
     joint_id = self._target_ids[self._gripper]
     self._gripper_target[env_ids] = self._entity.data.joint_pos[env_ids, joint_id]
+    
